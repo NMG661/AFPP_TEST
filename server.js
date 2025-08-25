@@ -8,10 +8,16 @@ const PORT = 9090;
 const server = app.listen(PORT, () => {
     console.log("Server listening on port: " + PORT);
 });
+const API_KEY = "minha-chave-secreta-12345-xyz-987"
 
 const wss = new WebSocket.Server({ server });
 
 wss.on("connection", async (socket) => {
+    const apikey = request.headers["x-api-key"];
+    if (!apikey || apikey ! = = API_KEY) {
+        console.log("Conexão recusada:Chave de api inválida.");
+        socket.close();
+    }
     const uuid = v4();
     await playerlist.add(uuid);
     const newPlayer = await playerlist.get(uuid);
