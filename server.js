@@ -14,9 +14,6 @@ const wss = new WebSocket.Server({ server });
 
 wss.on("connection", async (socket) => {
     const apikey = request.headers["x-api-key"];
-if (!apikey || apikey !== API_KEY) {
-        console.log("Conexão recusada:Chave de api inválida.");
-        socket.close();
     }
     const uuid = v4();
     await playerlist.add(uuid);
