@@ -5,16 +5,28 @@ const playerlist = require("./playerlist.js");
 
 const app = express();
 const PORT = 9090;
+
+// O servidor escuta na porta definida
 const server = app.listen(PORT, () => {
     console.log("Server listening on port: " + PORT);
 });
-const API_KEY = "minha-chave-secreta-12345-xyz-987"
 
+// Define a sua chave de API
+const API_KEY = "minha-chave-secreta-12345-xyz-987";
+
+// Cria o servidor de WebSocket
 const wss = new WebSocket.Server({ server });
 
-wss.on("connection", async (socket) => {
-    const apikey = request.headers["x-api-key"];
+wss.on("connection", async (socket, request) => {
+    // Verifica se a chave de API é válida
+    const apiKey = request.headers["x-api-key"];
+    if (!apiKey || apiKey !== API_KEY) {
+        console.log("Conexão recusada: Chave de API inválida.");
+        socket.close();
+        return;
     }
+
+    // A partir daqui, a lógica de jogador é executada apenas para conexões válidas
     const uuid = v4();
     await playerlist.add(uuid);
     const newPlayer = await playerlist.get(uuid);
@@ -96,11 +108,7 @@ wss.on("connection", async (socket) => {
 
     socket.on("close", () => {
         console.log(`Cliente ${uuid} desconectado.`);
-
-        // Remover da lista
         playerlist.remove(uuid);
-
-        // Avisar os outros jogadores
         wss.clients.forEach((client) => {
             if (client.readyState === WebSocket.OPEN) {
                 client.send(JSON.stringify({
