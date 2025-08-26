@@ -11,22 +11,11 @@ const server = app.listen(PORT, () => {
     console.log("Server listening on port: " + PORT);
 });
 
-// Define a sua chave de API
-const API_KEY = "minha-chave-secreta-12345-xyz-987";
-
 // Cria o servidor de WebSocket
 const wss = new WebSocket.Server({ server });
 
-wss.on("connection", async (socket, request) => {
-    // Verifica se a chave de API é válida
-    const apiKey = request.headers["x-api-key"];
-    if (!apiKey || apiKey !== API_KEY) {
-        console.log("Conexão recusada: Chave de API inválida.");
-        socket.close();
-        return;
-    }
-
-    // A partir daqui, a lógica de jogador é executada apenas para conexões válidas
+wss.on("connection", async (socket) => {
+    // A partir daqui, a lógica de jogador é executada para QUALQUER conexão
     const uuid = v4();
     await playerlist.add(uuid);
     const newPlayer = await playerlist.get(uuid);
