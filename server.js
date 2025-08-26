@@ -10,11 +10,12 @@ const server = app.listen(PORT, () => {
     console.log("Server listening on port: " + PORT);
 });
 
+// Defina a sua chave de API aqui
 const API_KEY = "minha-chave-secreta-12345-xyz-987";
 
 const wss = new WebSocket.Server({ server });
 
-// Corrigido: a função agora tem (socket, request)
+// Corrigido: a função agora tem os argumentos (socket, request)
 wss.on("connection", async (socket, request) => {
     // Verifica se a chave de API é válida
     const apiKey = request.headers["x-api-key"];
@@ -24,6 +25,7 @@ wss.on("connection", async (socket, request) => {
         return;
     }
 
+    // A partir daqui, a lógica de jogador é executada para conexões válidas
     const uuid = v4();
     await playerlist.add(uuid);
     const newPlayer = await playerlist.get(uuid);
@@ -79,36 +81,3 @@ wss.on("connection", async (socket, request) => {
             wss.clients.forEach((client) => {
                 if (client !== socket && client.readyState === WebSocket.OPEN) {
                     client.send(JSON.stringify(update));
-                }
-            });
-        }
-
-        if (data.cmd === "chat") {
-            const chat = {
-                cmd: "new_chat_message",
-                content: {
-                    msg: data.content.msg
-                }
-            };
-
-            wss.clients.forEach((client) => {
-                if (client.readyState === WebSocket.OPEN) {
-                    client.send(JSON.stringify(chat));
-                }
-            });
-        }
-    });
-
-    socket.on("close", () => {
-        console.log(`Cliente ${uuid} desconectado.`);
-        playerlist.remove(uuid);
-        wss.clients.forEach((client) => {
-            if (client.readyState === WebSocket.OPEN) {
-                client.send(JSON.stringify({
-                    cmd: "player_disconnected",
-                    content: { uuid }
-                }));
-            }
-        });
-    });
-});
