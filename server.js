@@ -6,33 +6,38 @@ const playerlist = require("./playerlist.js");
 const app = express();
 const PORT = 9090;
 
-// O servidor escuta na porta definida
 const server = app.listen(PORT, () => {
     console.log("Server listening on port: " + PORT);
 });
 
-// Cria o servidor de WebSocket
+const API_KEY = "minha-chave-secreta-12345-xyz-987";
+
 const wss = new WebSocket.Server({ server });
 
-wss.on("connection", async (socket) => {
-    // A partir daqui, a lógica de jogador é executada para QUALQUER conexão
+// Corrigido: a função agora tem (socket, request)
+wss.on("connection", async (socket, request) => {
+    // Verifica se a chave de API é válida
+    const apiKey = request.headers["x-api-key"];
+    if (!apiKey || apiKey !== API_KEY) {
+        console.log("Conexão recusada: Chave de API inválida.");
+        socket.close();
+        return;
+    }
+
     const uuid = v4();
     await playerlist.add(uuid);
     const newPlayer = await playerlist.get(uuid);
 
-    // Enviar UUID ao cliente
     socket.send(JSON.stringify({
         cmd: "joined_server",
         content: { msg: "Bem-vindo ao servidor!", uuid }
     }));
 
-    // Enviar jogador local
     socket.send(JSON.stringify({
         cmd: "spawn_local_player",
         content: { msg: "Spawning local (you) player!", player: newPlayer }
     }));
 
-    // Enviar novo jogador para todos os outros
     wss.clients.forEach((client) => {
         if (client !== socket && client.readyState === WebSocket.OPEN) {
             client.send(JSON.stringify({
@@ -42,7 +47,6 @@ wss.on("connection", async (socket) => {
         }
     });
 
-    // Enviar todos os outros jogadores ao novo cliente
     socket.send(JSON.stringify({
         cmd: "spawn_network_players",
         content: {
