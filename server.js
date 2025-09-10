@@ -1,87 +1,89 @@
+// server.js
 const WebSocket = require("ws");
-const { v4: uuidv4 } = require("uuid"); // gera UUID único
-const PORT = 10000;
+const { v4: uuidv4 } = require("uuid");
 
-const wss = new WebSocket.Server({ port: PORT });
+const wss = new WebSocket.Server({ port: 8080 });
 
-// Lista global de jogadores
-let players = {};
+let players = {}; // { uuid: { uuid, x, y } }
 
-console.log(`🌍 Servidor rodando na porta ${PORT}`);
-
-// Quando alguém se conecta
 wss.on("connection", (ws) => {
-  const playerId = uuidv4();
-  players[playerId] = { uuid: playerId, x: 0, y: 0, z: 0 };
+  const uuid = uuidv4();
+  console.log(`✅ Novo jogador conectado: ${uuid}`);
 
-  console.log(`✅ Novo jogador conectado: ${playerId}`);
+  // Inicializa posição padrão (0,0 por exemplo)
+  players[uuid] = { uuid: uuid, x: 0, y: 0 };
 
-  // Envia confirmação + dados do mundo atual
-  ws.send(JSON.stringify({
-    cmd: "joined_server",
-    content: {
-      msg: "Bem-vindo ao servidor!",
-      uuid: playerId,
-      players: Object.values(players) // envia todos os jogadores já conectados
-    }
-  }));
+  // Envia para o jogador conectado: todos os outros que já estão no mundo
+  ws.send(
+    JSON.stringify({
+      type: "spawn_network_players",
+      players: Object.values(players),
+    })
+  );
 
-  // Avisa os outros jogadores que um novo player entrou
-  broadcast(ws, {
-    cmd: "spawn_new_player",
-    content: players[playerId]
-  });
+  // Informa a todos os outros que este novo jogador entrou
+  broadcast(
+    {
+      type: "spawn_new_player",
+      player: players[uuid],
+    },
+    ws
+  );
 
-  // Quando o cliente manda dados (posição, chat, etc.)
-  ws.on("message", (msg) => {
+  // Cria o próprio player no cliente
+  ws.send(
+    JSON.stringify({
+      type: "spawn_local_player",
+      player: players[uuid],
+    })
+  );
+
+  // Quando o cliente manda atualização de posição
+  ws.on("message", (message) => {
     try {
-      const data = JSON.parse(msg.toString());
+      const data = JSON.parse(message);
 
-      if (data.cmd === "update_position") {
-        // Atualiza posição do jogador
-        if (players[data.content.uuid]) {
-          players[data.content.uuid].x = data.content.x;
-          players[data.content.uuid].y = data.content.y;
-          players[data.content.uuid].z = data.content.z;
+      if (data.type === "update_position") {
+        if (players[uuid]) {
+          players[uuid].x = data.x;
+          players[uuid].y = data.y;
+
+          broadcast(
+            {
+              type: "update_position",
+              uuid: uuid,
+              x: data.x,
+              y: data.y,
+            },
+            ws
+          );
         }
-
-        // Repassa para os outros
-        broadcast(ws, {
-          cmd: "update_position",
-          content: data.content
-        });
       }
-
-      if (data.cmd === "chat") {
-        broadcast(ws, {
-          cmd: "new_chat_message",
-          content: { uuid: playerId, msg: data.content.msg }
-        });
-      }
-
-    } catch (err) {
-      console.error("❌ Erro ao processar mensagem:", err);
+    } catch (e) {
+      console.error("❌ Erro ao processar mensagem:", e);
     }
   });
 
-  // Quando o jogador sai
+  // Quando o cliente desconecta
   ws.on("close", () => {
-    console.log(`🚪 Jogador saiu: ${playerId}`);
-    delete players[playerId];
+    console.log(`👋 Jogador saiu: ${uuid}`);
 
-    // Avisa os outros clientes
-    broadcast(ws, {
-      cmd: "player_disconnected",
-      content: { uuid: playerId }
+    delete players[uuid];
+
+    broadcast({
+      type: "player_disconnected",
+      uuid: uuid,
     });
   });
 });
 
-// Função para enviar mensagem para todos menos o próprio
-function broadcast(sender, data) {
+function broadcast(msg, exclude) {
+  const data = JSON.stringify(msg);
   wss.clients.forEach((client) => {
-    if (client !== sender && client.readyState === WebSocket.OPEN) {
-      client.send(JSON.stringify(data));
+    if (client.readyState === WebSocket.OPEN && client !== exclude) {
+      client.send(data);
     }
   });
 }
+
+console.log("🚀 Servidor rodando na porta 8080");
